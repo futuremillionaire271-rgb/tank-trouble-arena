@@ -1,6 +1,6 @@
 // Render API deploy helper
 const https = require('https');
-const KEY = process.env.RENDER_KEY || 'rnd_oVCDsAwBBLgwkQ9Q4YMudMBVMfhn';
+const KEY = process.env.RENDER_KEY || '';
 function api(method, path, body) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
