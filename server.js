@@ -498,4 +498,8 @@ setInterval(() => {
   for (const room of rooms.values()) room.broadcast(room.snapshot());
 }, SNAP);
 
-server.listen(PORT, () => console.log(`Tank Trouble server on http://localhost:${PORT}`));
+if (require.main === module) {
+  server.listen(PORT, () => console.log(`Tank Trouble server on http://localhost:${PORT}`));
+} else {
+  module.exports = { Room, generateMaze, CELL, TANK_R, rooms };
+}

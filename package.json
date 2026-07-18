@@ -1,13 +1,14 @@
 {
   "name": "tank-trouble",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Online 3-player Tank Trouble with random mazes and power-ups",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "test": "node unit-test.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["game", "tank", "multiplayer"],
+  "author": "Mars Studio",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
