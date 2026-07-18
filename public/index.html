@@ -3,79 +3,175 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Tank Trouble Online</title>
+<title>TANK TROUBLE — Arena</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; font-family: 'Segoe UI', Arial, sans-serif; touch-action: none; }
-  #menu {
-    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: radial-gradient(circle at 50% 30%, #24244a, #12121f); z-index: 10; gap: 14px; padding: 20px;
+  :root {
+    --red: #ff4d5e; --green: #3ddc84; --blue: #4d9fff;
+    --yellow: #ffd24d; --purple: #b06dff; --cyan: #35e0d8;
+    --gold: #ffcf5c; --bg0: #0b0e1a; --bg1: #141a30;
   }
-  #menu h1 { color: #fff; font-size: clamp(28px, 7vw, 52px); letter-spacing: 2px; text-shadow: 0 0 24px #4a7cff; }
-  #menu h1 span.r { color: #ff5555; } #menu h1 span.g { color: #55dd55; } #menu h1 span.b { color: #5599ff; }
-  #menu input {
-    padding: 12px 16px; font-size: 18px; border-radius: 10px; border: 2px solid #444a7a; background: #22223a;
-    color: #fff; width: min(300px, 80vw); text-align: center; outline: none;
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg0); font-family: 'Segoe UI', system-ui, Arial, sans-serif; touch-action: none; }
+
+  /* ------- animated menu ------- */
+  #menu { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #menuBg { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 20%, #1b2340 0%, #0b0e1a 70%); }
+  #menuCanvas { position: absolute; inset: 0; opacity: .55; }
+  .panel {
+    position: relative; z-index: 2; width: min(400px, 92vw); padding: 34px 30px 28px;
+    background: rgba(18, 24, 48, .72); border: 1px solid rgba(120, 150, 255, .18);
+    border-radius: 22px; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 24px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
+    display: flex; flex-direction: column; gap: 13px; animation: panelIn .6s cubic-bezier(.2,1.4,.4,1);
   }
-  #menu input:focus { border-color: #4a7cff; }
-  #menu button {
-    padding: 14px 20px; font-size: 18px; border-radius: 10px; border: none; cursor: pointer;
-    width: min(300px, 80vw); font-weight: bold; color: #fff; transition: transform .1s;
+  @keyframes panelIn { from { transform: translateY(40px) scale(.92); opacity: 0; } }
+  .logo { text-align: center; margin-bottom: 6px; }
+  .logo h1 {
+    font-size: clamp(30px, 8vw, 44px); font-weight: 900; letter-spacing: 4px; line-height: 1;
+    background: linear-gradient(120deg, #fff 20%, #9db4ff 50%, #fff 80%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    background-size: 200% 100%; animation: shine 3.5s linear infinite;
+    filter: drop-shadow(0 0 18px rgba(90,130,255,.5));
   }
-  #menu button:active { transform: scale(0.96); }
-  #btnQuick { background: linear-gradient(135deg, #4a7cff, #2a4cd0); }
-  #btnCreate { background: linear-gradient(135deg, #44bb66, #218844); }
-  #btnJoin { background: linear-gradient(135deg, #cc8833, #a05f18); }
-  #menuMsg { color: #ff7777; min-height: 22px; font-size: 15px; }
-  #hud {
-    position: absolute; top: 0; left: 0; right: 0; display: none; justify-content: center; gap: 18px;
-    padding: 8px; z-index: 5; pointer-events: none; flex-wrap: wrap;
+  @keyframes shine { to { background-position: 200% 0; } }
+  .logo .sub { font-size: 12px; letter-spacing: 7px; color: #6a7ba8; margin-top: 6px; font-weight: 600; }
+  .logo .sub b.r { color: var(--red); } .logo .sub b.g { color: var(--green); } .logo .sub b.b { color: var(--blue); }
+  .field { position: relative; }
+  .field input {
+    width: 100%; padding: 14px 16px; font-size: 16px; border-radius: 12px; color: #fff; outline: none;
+    background: rgba(10, 14, 30, .8); border: 1.5px solid rgba(120, 150, 255, .2); text-align: center;
+    transition: border-color .2s, box-shadow .2s; font-weight: 600; letter-spacing: 1px;
   }
-  .score { color: #fff; font-size: 17px; font-weight: bold; background: rgba(0,0,0,.45); padding: 4px 12px; border-radius: 16px; }
-  #roomTag { position: absolute; top: 8px; right: 10px; color: #aaa; font-size: 14px; z-index: 5; display: none; background: rgba(0,0,0,.4); padding: 4px 10px; border-radius: 12px; }
+  .field input:focus { border-color: #5d8bff; box-shadow: 0 0 0 3px rgba(93,139,255,.18); }
+  .field input::placeholder { color: #55638f; font-weight: 400; }
+  .btn {
+    position: relative; padding: 15px 18px; font-size: 16px; font-weight: 800; letter-spacing: 1px;
+    border-radius: 12px; border: none; cursor: pointer; color: #fff; overflow: hidden;
+    transition: transform .12s, box-shadow .2s, filter .2s;
+  }
+  .btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.25) 50%, transparent 70%); transform: translateX(-100%); transition: transform .5s; }
+  .btn:hover::after { transform: translateX(100%); }
+  .btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+  .btn:active { transform: scale(.97); }
+  #btnQuick { background: linear-gradient(135deg, #5d8bff, #3a5fd9); box-shadow: 0 8px 24px rgba(70,110,255,.35); }
+  #btnCreate { background: linear-gradient(135deg, #2fbf71, #1d8f52); box-shadow: 0 8px 24px rgba(45,180,110,.3); }
+  .joinRow { display: flex; gap: 10px; }
+  .joinRow .field { flex: 1; }
+  #btnJoin { background: linear-gradient(135deg, #e0983a, #b06f1d); box-shadow: 0 8px 24px rgba(220,150,50,.28); padding: 15px 22px; }
+  #menuMsg { color: #ff7d8a; min-height: 20px; font-size: 14px; text-align: center; font-weight: 600; }
+  .hint { text-align: center; color: #4d5b85; font-size: 12px; letter-spacing: .5px; }
+
+  /* ------- game HUD ------- */
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 8; display: none;
+    justify-content: center; align-items: center; gap: 10px; padding: 10px 12px; pointer-events: none; flex-wrap: wrap;
+  }
+  .scorecard {
+    display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 8px; border-radius: 30px;
+    background: rgba(12, 16, 34, .78); border: 1px solid rgba(120,150,255,.14);
+    backdrop-filter: blur(10px); box-shadow: 0 4px 16px rgba(0,0,0,.4);
+    color: #fff; font-weight: 700; font-size: 14px; transition: transform .25s;
+  }
+  .scorecard.me { border-color: rgba(255,255,255,.4); }
+  .scorecard .dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; color: rgba(0,0,0,.55); font-weight: 900; }
+  .scorecard .pts { color: var(--gold); margin-left: 2px; }
+  .scorecard.bump { animation: bump .45s cubic-bezier(.2,2,.4,1); }
+  @keyframes bump { 40% { transform: scale(1.18); } }
+  #roomTag {
+    position: absolute; top: 10px; right: 12px; z-index: 8; display: none; pointer-events: auto; cursor: pointer;
+    color: #8fa2d8; font-size: 13px; font-weight: 700; letter-spacing: 2px;
+    background: rgba(12,16,34,.78); padding: 7px 14px; border-radius: 20px; border: 1px solid rgba(120,150,255,.14);
+    backdrop-filter: blur(10px);
+  }
+  #roomTag:active { transform: scale(.95); }
+  #pingTag { position: absolute; top: 10px; left: 12px; z-index: 8; display: none; color: #56d98a; font-size: 12px; font-weight: 700; background: rgba(12,16,34,.78); padding: 7px 12px; border-radius: 20px; border: 1px solid rgba(120,150,255,.14); backdrop-filter: blur(10px); }
+
+  /* kill feed */
+  #killfeed { position: absolute; top: 56px; right: 12px; z-index: 8; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; pointer-events: none; }
+  .kf {
+    padding: 6px 14px; border-radius: 18px; font-size: 13px; font-weight: 700; color: #dfe6ff;
+    background: rgba(12,16,34,.85); border: 1px solid rgba(120,150,255,.16); backdrop-filter: blur(8px);
+    animation: kfIn .35s cubic-bezier(.2,1.6,.4,1); box-shadow: 0 4px 14px rgba(0,0,0,.4);
+  }
+  .kf.out { animation: kfOut .4s forwards; }
+  @keyframes kfIn { from { transform: translateX(60px); opacity: 0; } }
+  @keyframes kfOut { to { transform: translateX(60px); opacity: 0; } }
+
+  /* round banner */
+  #banner { position: absolute; inset: 0; z-index: 9; display: none; align-items: center; justify-content: center; pointer-events: none; flex-direction: column; gap: 10px; }
+  #bannerText {
+    font-size: clamp(30px, 7vw, 58px); font-weight: 900; letter-spacing: 3px; color: #fff;
+    text-shadow: 0 4px 30px rgba(0,0,0,.8); animation: bannerIn .5s cubic-bezier(.2,1.8,.4,1);
+  }
+  #bannerSub { font-size: clamp(14px, 3vw, 20px); color: #8fa2d8; font-weight: 600; letter-spacing: 2px; animation: bannerIn .6s cubic-bezier(.2,1.8,.4,1); }
+  @keyframes bannerIn { from { transform: scale(.4); opacity: 0; } }
+
   canvas#game { position: absolute; inset: 0; display: block; }
-  #banner {
-    position: absolute; top: 40%; left: 0; right: 0; text-align: center; color: #fff; font-size: clamp(22px, 5vw, 40px);
-    font-weight: bold; text-shadow: 0 2px 10px #000; z-index: 6; pointer-events: none; display: none;
-  }
-  /* touch controls */
-  #touchUI { position: absolute; inset: 0; z-index: 4; display: none; }
+
+  /* ------- touch controls ------- */
+  #touchUI { position: absolute; inset: 0; z-index: 7; display: none; pointer-events: none; }
   #joyBase {
-    position: absolute; left: 4vw; bottom: 5vh; width: 130px; height: 130px; border-radius: 50%;
-    background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.25);
+    position: absolute; left: 5vw; bottom: 5vh; width: 132px; height: 132px; border-radius: 50%; pointer-events: auto;
+    background: radial-gradient(circle, rgba(120,150,255,.08), rgba(120,150,255,.03));
+    border: 2px solid rgba(140,165,255,.25); box-shadow: inset 0 0 24px rgba(90,120,255,.1);
   }
   #joyKnob {
-    position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%;
-    background: rgba(255,255,255,.35);
+    position: absolute; left: 41px; top: 41px; width: 50px; height: 50px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(200,215,255,.7), rgba(110,140,255,.4));
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); transition: transform .05s;
   }
   #btnFire {
-    position: absolute; right: 5vw; bottom: 6vh; width: 96px; height: 96px; border-radius: 50%;
-    background: rgba(255,80,80,.35); border: 3px solid rgba(255,90,90,.7); color: #fff;
-    font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+    position: absolute; right: 6vw; bottom: 6vh; width: 100px; height: 100px; border-radius: 50%; pointer-events: auto;
+    background: radial-gradient(circle at 35% 30%, rgba(255,120,120,.5), rgba(200,40,60,.35));
+    border: 3px solid rgba(255,100,110,.65); color: #fff; font-size: 17px; font-weight: 900; letter-spacing: 2px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 30px rgba(255,60,80,.25), inset 0 0 20px rgba(255,255,255,.08);
   }
-  #btnFire:active { background: rgba(255,80,80,.6); }
-  #helpKeys { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; color: #667; font-size: 13px; z-index: 3; display: none; }
+  #btnFire.pressed { transform: scale(.9); background: radial-gradient(circle at 35% 30%, rgba(255,150,150,.8), rgba(230,50,70,.6)); }
+  #helpKeys { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #3e4a72; font-size: 12px; z-index: 6; display: none; letter-spacing: 1px; }
+
+  /* toast */
+  #toast {
+    position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 30;
+    background: rgba(20,28,55,.95); color: #fff; padding: 10px 22px; border-radius: 24px; font-weight: 700; font-size: 14px;
+    border: 1px solid rgba(120,150,255,.25); opacity: 0; transition: all .3s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
 <div id="menu">
-  <h1>TANK <span class="r">TR</span><span class="g">OU</span><span class="b">BLE</span></h1>
-  <input id="nameInput" maxlength="12" placeholder="Your name">
-  <button id="btnQuick">⚡ Quick Play</button>
-  <button id="btnCreate">+ Create Room</button>
-  <input id="roomInput" maxlength="4" placeholder="Room code" style="text-transform:uppercase">
-  <button id="btnJoin">Join Room</button>
-  <div id="menuMsg"></div>
+  <div id="menuBg"></div>
+  <canvas id="menuCanvas"></canvas>
+  <div class="panel">
+    <div class="logo">
+      <h1>TANK TROUBLE</h1>
+      <div class="sub"><b class="r">ARENA</b> · <b class="g">ONLINE</b> · <b class="b">6P</b></div>
+    </div>
+    <div class="field"><input id="nameInput" maxlength="12" placeholder="ENTER YOUR CALLSIGN" autocomplete="off"></div>
+    <button class="btn" id="btnQuick">⚡ &nbsp;QUICK MATCH</button>
+    <button class="btn" id="btnCreate">🛡 &nbsp;CREATE PRIVATE ROOM</button>
+    <div class="joinRow">
+      <div class="field"><input id="roomInput" maxlength="4" placeholder="CODE" style="text-transform:uppercase" autocomplete="off"></div>
+      <button class="btn" id="btnJoin">JOIN</button>
+    </div>
+    <div id="menuMsg"></div>
+    <div class="hint">Up to 6 tanks · bouncing bullets · 9 power-ups · new maze every round</div>
+  </div>
 </div>
-<div id="hud"></div>
-<div id="roomTag"></div>
-<div id="banner"></div>
+
+<div id="topbar"></div>
+<div id="roomTag" title="Tap to copy invite link"></div>
+<div id="pingTag"></div>
+<div id="killfeed"></div>
+<div id="banner"><div id="bannerText"></div><div id="bannerSub"></div></div>
 <canvas id="game"></canvas>
 <div id="touchUI">
   <div id="joyBase"><div id="joyKnob"></div></div>
   <div id="btnFire">FIRE</div>
 </div>
-<div id="helpKeys">Move: WASD or Arrow keys &nbsp;•&nbsp; Fire: Space or M</div>
+<div id="helpKeys">MOVE &nbsp;WASD / ARROWS &nbsp;·&nbsp; FIRE &nbsp;SPACE</div>
+<div id="toast"></div>
 <script src="client.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // Verify public tunnel: HTTPS page load + secure WebSocket game join
 const https = require('https');
 const WebSocket = require('ws');
-const HOST = 'broadcasting-helen-icon-audio.trycloudflare.com';
+const HOST = process.argv[2] || 'angle-florence-predicted-primarily.trycloudflare.com';
 
 function get(p) {
   return new Promise(res => https.get(`https://${HOST}${p}`, r => res(r.statusCode)).on('error', e => res('ERR ' + e.message)));
