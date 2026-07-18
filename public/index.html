@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Tank Trouble Online</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; font-family: 'Segoe UI', Arial, sans-serif; touch-action: none; }
+  #menu {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 30%, #24244a, #12121f); z-index: 10; gap: 14px; padding: 20px;
+  }
+  #menu h1 { color: #fff; font-size: clamp(28px, 7vw, 52px); letter-spacing: 2px; text-shadow: 0 0 24px #4a7cff; }
+  #menu h1 span.r { color: #ff5555; } #menu h1 span.g { color: #55dd55; } #menu h1 span.b { color: #5599ff; }
+  #menu input {
+    padding: 12px 16px; font-size: 18px; border-radius: 10px; border: 2px solid #444a7a; background: #22223a;
+    color: #fff; width: min(300px, 80vw); text-align: center; outline: none;
+  }
+  #menu input:focus { border-color: #4a7cff; }
+  #menu button {
+    padding: 14px 20px; font-size: 18px; border-radius: 10px; border: none; cursor: pointer;
+    width: min(300px, 80vw); font-weight: bold; color: #fff; transition: transform .1s;
+  }
+  #menu button:active { transform: scale(0.96); }
+  #btnQuick { background: linear-gradient(135deg, #4a7cff, #2a4cd0); }
+  #btnCreate { background: linear-gradient(135deg, #44bb66, #218844); }
+  #btnJoin { background: linear-gradient(135deg, #cc8833, #a05f18); }
+  #menuMsg { color: #ff7777; min-height: 22px; font-size: 15px; }
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0; display: none; justify-content: center; gap: 18px;
+    padding: 8px; z-index: 5; pointer-events: none; flex-wrap: wrap;
+  }
+  .score { color: #fff; font-size: 17px; font-weight: bold; background: rgba(0,0,0,.45); padding: 4px 12px; border-radius: 16px; }
+  #roomTag { position: absolute; top: 8px; right: 10px; color: #aaa; font-size: 14px; z-index: 5; display: none; background: rgba(0,0,0,.4); padding: 4px 10px; border-radius: 12px; }
+  canvas#game { position: absolute; inset: 0; display: block; }
+  #banner {
+    position: absolute; top: 40%; left: 0; right: 0; text-align: center; color: #fff; font-size: clamp(22px, 5vw, 40px);
+    font-weight: bold; text-shadow: 0 2px 10px #000; z-index: 6; pointer-events: none; display: none;
+  }
+  /* touch controls */
+  #touchUI { position: absolute; inset: 0; z-index: 4; display: none; }
+  #joyBase {
+    position: absolute; left: 4vw; bottom: 5vh; width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.25);
+  }
+  #joyKnob {
+    position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%;
+    background: rgba(255,255,255,.35);
+  }
+  #btnFire {
+    position: absolute; right: 5vw; bottom: 6vh; width: 96px; height: 96px; border-radius: 50%;
+    background: rgba(255,80,80,.35); border: 3px solid rgba(255,90,90,.7); color: #fff;
+    font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+  }
+  #btnFire:active { background: rgba(255,80,80,.6); }
+  #helpKeys { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; color: #667; font-size: 13px; z-index: 3; display: none; }
+</style>
+</head>
+<body>
+<div id="menu">
+  <h1>TANK <span class="r">TR</span><span class="g">OU</span><span class="b">BLE</span></h1>
+  <input id="nameInput" maxlength="12" placeholder="Your name">
+  <button id="btnQuick">⚡ Quick Play</button>
+  <button id="btnCreate">+ Create Room</button>
+  <input id="roomInput" maxlength="4" placeholder="Room code" style="text-transform:uppercase">
+  <button id="btnJoin">Join Room</button>
+  <div id="menuMsg"></div>
+</div>
+<div id="hud"></div>
+<div id="roomTag"></div>
+<div id="banner"></div>
+<canvas id="game"></canvas>
+<div id="touchUI">
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <div id="btnFire">FIRE</div>
+</div>
+<div id="helpKeys">Move: WASD or Arrow keys &nbsp;•&nbsp; Fire: Space or M</div>
+<script src="client.js"></script>
+</body>
+</html>
