@@ -115,26 +115,33 @@
 
   canvas#game { position: absolute; inset: 0; display: block; }
 
-  /* ------- touch controls ------- */
+  /* ------- touch controls: dynamic zones ------- */
   #touchUI { position: absolute; inset: 0; z-index: 7; display: none; pointer-events: none; }
   #joyBase {
-    position: absolute; left: 5vw; bottom: 5vh; width: 132px; height: 132px; border-radius: 50%; pointer-events: auto;
-    background: radial-gradient(circle, rgba(120,150,255,.08), rgba(120,150,255,.03));
-    border: 2px solid rgba(140,165,255,.25); box-shadow: inset 0 0 24px rgba(90,120,255,.1);
+    position: absolute; width: 140px; height: 140px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(120,150,255,.10), rgba(120,150,255,.03));
+    border: 2px solid rgba(140,165,255,.35); box-shadow: inset 0 0 24px rgba(90,120,255,.12);
+    display: none; transform: translate(-50%, -50%);
   }
   #joyKnob {
-    position: absolute; left: 41px; top: 41px; width: 50px; height: 50px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, rgba(200,215,255,.7), rgba(110,140,255,.4));
-    box-shadow: 0 4px 14px rgba(0,0,0,.5); transition: transform .05s;
+    position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(200,215,255,.85), rgba(110,140,255,.55));
+    box-shadow: 0 4px 14px rgba(0,0,0,.5); transform: translate(-50%, -50%);
   }
-  #btnFire {
-    position: absolute; right: 6vw; bottom: 6vh; width: 100px; height: 100px; border-radius: 50%; pointer-events: auto;
-    background: radial-gradient(circle at 35% 30%, rgba(255,120,120,.5), rgba(200,40,60,.35));
-    border: 3px solid rgba(255,100,110,.65); color: #fff; font-size: 17px; font-weight: 900; letter-spacing: 2px;
+  #fireHint {
+    position: absolute; right: 6vw; bottom: 6vh; width: 104px; height: 104px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 35% 30%, rgba(255,120,120,.4), rgba(200,40,60,.25));
+    border: 3px solid rgba(255,100,110,.55); color: #fff; font-size: 16px; font-weight: 900; letter-spacing: 2px;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 30px rgba(255,60,80,.25), inset 0 0 20px rgba(255,255,255,.08);
+    box-shadow: 0 0 30px rgba(255,60,80,.22);
+    transition: transform .08s, background .08s;
   }
-  #btnFire.pressed { transform: scale(.9); background: radial-gradient(circle at 35% 30%, rgba(255,150,150,.8), rgba(230,50,70,.6)); }
+  #fireHint.pressed { transform: scale(.88); background: radial-gradient(circle at 35% 30%, rgba(255,160,160,.85), rgba(235,60,80,.65)); }
+  .zoneHint {
+    position: absolute; bottom: 24vh; color: rgba(150,170,230,.5); font-size: 12px; font-weight: 700;
+    letter-spacing: 1px; text-align: center; width: 45%; pointer-events: none;
+  }
+  #zoneL { left: 2%; } #zoneR { right: 2%; color: rgba(255,150,160,.55); }
   #helpKeys { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #3e4a72; font-size: 12px; z-index: 6; display: none; letter-spacing: 1px; }
 
   /* weapon card */
@@ -194,7 +201,9 @@
 <canvas id="game"></canvas>
 <div id="touchUI">
   <div id="joyBase"><div id="joyKnob"></div></div>
-  <div id="btnFire">FIRE</div>
+  <div id="fireHint">FIRE</div>
+  <div class="zoneHint" id="zoneL">TOUCH ANYWHERE LEFT TO DRIVE</div>
+  <div class="zoneHint" id="zoneR">TAP ANYWHERE RIGHT TO FIRE</div>
 </div>
 <div id="helpKeys">MOVE &nbsp;WASD / ARROWS &nbsp;·&nbsp; FIRE &nbsp;SPACE</div>
 <div id="toast"></div>

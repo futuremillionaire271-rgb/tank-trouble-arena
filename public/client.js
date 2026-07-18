@@ -320,41 +320,75 @@ window.addEventListener('keyup', e => {
   if (e.key === ' ' || e.key.toLowerCase() === 'm') firePressed = false;
 });
 
-const joyBase = $('joyBase'), joyKnob = $('joyKnob'), btnFire = $('btnFire');
+// ---------- dynamic touch zones ----------
+// Left half of screen: touch anywhere, joystick appears under the finger.
+// Right half: touch anywhere to fire. No tiny buttons to miss.
+const joyBase = $('joyBase'), fireHint = $('fireHint');
 let joyTouchId = null, fireTouchId = null;
-function joyCenter() { const r = joyBase.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, rad: r.width / 2 }; }
-function handleJoy(tx, ty) {
-  const c = joyCenter();
-  let dx = tx - c.x, dy = ty - c.y;
-  const d = Math.hypot(dx, dy), max = c.rad;
-  if (d > max) { dx = dx / d * max; dy = dy / d * max; }
-  joyKnob.style.left = (41 + dx) + 'px';
-  joyKnob.style.top = (41 + dy) + 'px';
-  touchState.active = d > max * 0.16;
-  touchState.a = Math.atan2(dy, dx);
-  touchState.t = Math.min(d / max, 1);
+let joyOrigin = { x: 0, y: 0 };
+const JOY_RADIUS = 60;
+function updateJoy(tx, ty) {
+  let dx = tx - joyOrigin.x, dy = ty - joyOrigin.y;
+  const d = Math.hypot(dx, dy);
+  // joystick follows finger if dragged beyond radius (feels natural while running)
+  if (d > JOY_RADIUS) {
+    joyOrigin.x = tx - dx / d * JOY_RADIUS;
+    joyOrigin.y = ty - dy / d * JOY_RADIUS;
+    joyBase.style.left = joyOrigin.x + 'px';
+    joyBase.style.top = joyOrigin.y + 'px';
+    dx = tx - joyOrigin.x; dy = ty - joyOrigin.y;
+  }
+  const kd = Math.min(Math.hypot(dx, dy), JOY_RADIUS);
+  const ka = Math.atan2(dy, dx);
+  $('joyKnob').style.transform = `translate(calc(-50% + ${Math.cos(ka) * kd}px), calc(-50% + ${Math.sin(ka) * kd}px))`;
+  touchState.active = kd > JOY_RADIUS * 0.12;
+  touchState.a = ka;
+  touchState.t = Math.min(kd / (JOY_RADIUS * 0.85), 1);
 }
-function resetJoy() { joyTouchId = null; touchState.active = false; touchState.t = 0; joyKnob.style.left = '41px'; joyKnob.style.top = '41px'; }
+function startJoy(t) {
+  joyTouchId = t.identifier;
+  joyOrigin = { x: t.clientX, y: t.clientY };
+  joyBase.style.left = t.clientX + 'px';
+  joyBase.style.top = t.clientY + 'px';
+  joyBase.style.display = 'block';
+  $('zoneL').style.display = 'none';
+  updateJoy(t.clientX, t.clientY);
+}
+function resetJoy() {
+  joyTouchId = null; touchState.active = false; touchState.t = 0;
+  joyBase.style.display = 'none';
+  $('joyKnob').style.transform = 'translate(-50%, -50%)';
+}
 document.addEventListener('touchstart', e => {
   audio();
+  if ($('menu').style.display !== 'none') return;
+  // let UI buttons (exit, room code) receive normal taps
+  const el = e.target;
+  if (el.closest && (el.closest('#btnExit') || el.closest('#roomTag'))) return;
   for (const t of e.changedTouches) {
-    const jr = joyBase.getBoundingClientRect(), fr = btnFire.getBoundingClientRect();
-    const inJoy = t.clientX > jr.left - 30 && t.clientX < jr.right + 30 && t.clientY > jr.top - 30 && t.clientY < jr.bottom + 30;
-    const inFire = t.clientX > fr.left - 20 && t.clientX < fr.right + 20 && t.clientY > fr.top - 20 && t.clientY < fr.bottom + 20;
-    if (inJoy && joyTouchId === null) { joyTouchId = t.identifier; handleJoy(t.clientX, t.clientY); }
-    else if (inFire && fireTouchId === null) { fireTouchId = t.identifier; firePressed = true; btnFire.classList.add('pressed'); }
+    if (t.clientX < innerWidth / 2) {
+      if (joyTouchId === null) startJoy(t);
+    } else {
+      if (fireTouchId === null) {
+        fireTouchId = t.identifier; firePressed = true;
+        fireHint.classList.add('pressed');
+        $('zoneR').style.display = 'none';
+      }
+    }
   }
+  if (e.cancelable) e.preventDefault();
 }, { passive: false });
 document.addEventListener('touchmove', e => {
   if ($('menu').style.display !== 'none') return;
   e.preventDefault();
-  for (const t of e.changedTouches) if (t.identifier === joyTouchId) handleJoy(t.clientX, t.clientY);
+  for (const t of e.changedTouches) if (t.identifier === joyTouchId) updateJoy(t.clientX, t.clientY);
 }, { passive: false });
 function touchEnd(e) {
   for (const t of e.changedTouches) {
     if (t.identifier === joyTouchId) resetJoy();
-    if (t.identifier === fireTouchId) { fireTouchId = null; firePressed = false; btnFire.classList.remove('pressed'); }
+    if (t.identifier === fireTouchId) { fireTouchId = null; firePressed = false; fireHint.classList.remove('pressed'); }
   }
+  if (e.touches.length === 0) { resetJoy(); if (fireTouchId !== null) { fireTouchId = null; firePressed = false; fireHint.classList.remove('pressed'); } }
 }
 document.addEventListener('touchend', touchEnd);
 document.addEventListener('touchcancel', touchEnd);

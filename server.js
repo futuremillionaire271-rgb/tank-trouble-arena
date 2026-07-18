@@ -352,15 +352,17 @@ class Room {
       if (!p.alive) continue;
       const inp = p.input;
       const spdMul = p.speedBoost > 0 ? 1.45 : 1;
-      if (inp.vecAngle !== null && inp.vecThrottle > 0.15) {
-        const diff = angNorm(inp.vecAngle - p.angle);
-        const maxTurn = TANK_TURN * 1.7 * dt;
+      if (inp.vecAngle !== null && inp.vecThrottle > 0.1) {
+        // twin-stick style: turn toward stick, drive in reverse if target is behind
+        let diff = angNorm(inp.vecAngle - p.angle);
+        let dir = 1;
+        if (Math.abs(diff) > Math.PI * 0.58) { diff = angNorm(diff + Math.PI); dir = -1; }
+        const maxTurn = TANK_TURN * 2.3 * dt;
         p.angle += clamp(diff, -maxTurn, maxTurn);
-        if (Math.abs(diff) < 1.35) {
-          const sp = TANK_SPEED * spdMul * clamp(inp.vecThrottle, 0, 1);
-          p.x += Math.cos(p.angle) * sp * dt;
-          p.y += Math.sin(p.angle) * sp * dt;
-        }
+        const align = Math.max(0.35, Math.cos(diff));
+        const sp = TANK_SPEED * spdMul * clamp(inp.vecThrottle, 0, 1) * align * dir * (dir < 0 ? 0.8 : 1);
+        p.x += Math.cos(p.angle) * sp * dt;
+        p.y += Math.sin(p.angle) * sp * dt;
       } else {
         p.angle += inp.turn * TANK_TURN * dt;
         const sp = inp.move * TANK_SPEED * spdMul * (inp.move < 0 ? 0.62 : 1);
