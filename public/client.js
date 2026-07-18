@@ -90,6 +90,7 @@ function connect(msg) {
       $('roomTag').style.display = 'block';
       $('pingTag').style.display = 'block';
       $('roomTag').textContent = '⧉ ' + roomCode;
+      $('btnExit').style.display = 'block';
       if (isTouch) $('touchUI').style.display = 'block';
       else $('helpKeys').style.display = 'block';
       resize();
@@ -151,6 +152,10 @@ $('roomTag').onclick = () => {
     () => toast('Invite link copied!'),
     () => toast('Room code: ' + roomCode));
 };
+$('btnExit').onclick = () => {
+  if (ws) { try { ws.close(); } catch {} }
+  location.href = location.origin;
+};
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
@@ -165,6 +170,25 @@ function showBanner(text, color, sub) {
   $('bannerText').dataset.waiting = text.startsWith('WAITING') ? '1' : '0';
 }
 function hideBanner() { $('banner').style.display = 'none'; }
+// weapon card
+let cardWeapon = null;
+function updateWeaponCard(me) {
+  const w = me && me.al ? me.w : null;
+  const card = $('weaponCard');
+  const key = w ? w + ':' + (me.am || 0) : null;
+  if (key === cardWeapon) return;
+  cardWeapon = key;
+  if (!w || !WEAPON_INFO[w]) { card.classList.remove('show'); return; }
+  const info = WEAPON_INFO[w];
+  card.querySelector('.wIcon').textContent = info.icon;
+  card.querySelector('.wName').textContent = info.name;
+  card.querySelector('.wDesc').textContent = info.desc;
+  const ammoDiv = card.querySelector('.wAmmo');
+  const maxAmmo = { mine: 3, triple: 3, shotgun: 2 }[w];
+  ammoDiv.innerHTML = maxAmmo ? Array.from({ length: maxAmmo }, (_, i) => `<i class="${i < (me.am || 0) ? '' : 'off'}"></i>`).join('') : '';
+  card.classList.add('show');
+}
+
 let lastScores = {};
 function updateHud(m) {
   const bar = $('topbar');
@@ -345,7 +369,7 @@ setInterval(() => {
     const left = keys['a'] || keys['arrowleft'], right = keys['d'] || keys['arrowright'];
     ws.send(JSON.stringify({ type: 'input', seq: inputSeq, move: (up ? 1 : 0) - (down ? 1 : 0), turn: (right ? 1 : 0) - (left ? 1 : 0), fire: firePressed }));
   }
-}, 33);
+}, 25);
 
 // ---------- interpolation ----------
 function interpolatedState() {
@@ -427,7 +451,7 @@ function drawTank(t, dt) {
 
   ctx.save();
   ctx.translate(t.x, t.y);
-  if (t.gh) ctx.globalAlpha = 0.45;
+  if (t.gh) ctx.globalAlpha = t.c === myColor ? 0.35 : 0;
   // shadow
   ctx.save();
   ctx.translate(2, 3);
@@ -507,9 +531,61 @@ function drawTank(t, dt) {
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fillText(t.n, t.x, t.y + 31);
 }
-const WEAPON_LABEL = { laser: '⚡ LASER', missile: '🚀 MISSILE', gatling: '🔫 GATLING', frag: '💣 FRAG', mine: '☢ MINES', triple: '⋔ TRIPLE' };
-const PU_ICON = { laser: '⚡', missile: '🚀', gatling: '🔫', frag: '💣', shield: '🛡', mine: '☢', triple: '⋔', speed: '»', ghost: '👻' };
-const PU_COLOR = { laser: '#ffd24d', missile: '#ff8a4d', gatling: '#b8c4e0', frag: '#ff6b6b', shield: '#7adcff', mine: '#ff4d5e', triple: '#3ddc84', speed: '#4d9fff', ghost: '#b06dff' };
+const WEAPON_LABEL = { laser: '⚡ LASER', missile: '🚀 MISSILE', gatling: '🔫 GATLING', frag: '💣 FRAG', mine: '☢ MINES', triple: '⋔ TRIPLE', shotgun: '💥 SHOTGUN', bigshot: '⬤ CANNON' };
+const WEAPON_INFO = {
+  laser: { icon: '⚡', name: 'LASER', desc: 'Instant beam that bounces off walls. Aim with the red preview line!' },
+  missile: { icon: '🚀', name: 'HOMING MISSILE', desc: 'Flies straight, then hunts the NEAREST tank. Even you — run!' },
+  gatling: { icon: '🔫', name: 'GATLING', desc: 'Hold fire to spray a stream of bullets.' },
+  frag: { icon: '💣', name: 'FRAG BOMB', desc: 'Explodes into a deadly ring of shrapnel.' },
+  mine: { icon: '☢', name: 'MINES ×3', desc: 'Drop hidden traps behind you. They arm after 1s.' },
+  triple: { icon: '⋔', name: 'TRIPLE SHOT ×3', desc: 'Fires 3 bullets in a spread.' },
+  shotgun: { icon: '💥', name: 'SHOTGUN ×2', desc: 'Devastating blast of 6 pellets. Short range.' },
+  bigshot: { icon: '⬤', name: 'HEAVY CANNON', desc: 'Slow, huge shell that bounces forever.' },
+};
+const PU_ICON = { laser: '⚡', missile: '🚀', gatling: '🔫', frag: '💣', shield: '🛡', mine: '☢', triple: '⋔', speed: '»', ghost: '👻', shotgun: '💥', bigshot: '⬤' };
+const PU_COLOR = { laser: '#ffd24d', missile: '#ff8a4d', gatling: '#b8c4e0', frag: '#ff6b6b', shield: '#7adcff', mine: '#ff4d5e', triple: '#3ddc84', speed: '#4d9fff', ghost: '#b06dff', shotgun: '#ff9d5c', bigshot: '#e0e6f5' };
+
+// ---------- laser aim preview (client-side raycast) ----------
+function rayRectHit(x, y, dx, dy, w, maxDist) {
+  const x1 = w.x, x2 = w.x + w.w, y1 = w.y, y2 = w.y + w.h;
+  let tmin = 0, tmax = maxDist, nx = 0, ny = 0;
+  if (Math.abs(dx) < 1e-9) { if (x < x1 || x > x2) return null; }
+  else {
+    let t1 = (x1 - x) / dx, t2 = (x2 - x) / dx, n = -1;
+    if (t1 > t2) { [t1, t2] = [t2, t1]; n = 1; }
+    if (t1 > tmin) { tmin = t1; nx = n; ny = 0; }
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return null;
+  }
+  if (Math.abs(dy) < 1e-9) { if (y < y1 || y > y2) return null; }
+  else {
+    let t1 = (y1 - y) / dy, t2 = (y2 - y) / dy, n = -1;
+    if (t1 > t2) { [t1, t2] = [t2, t1]; n = 1; }
+    if (t1 > tmin) { tmin = t1; nx = 0; ny = n; }
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return null;
+  }
+  if (tmin <= 1e-6) return null;
+  return { t: tmin, nx, ny };
+}
+function laserPreviewPath(px, py, ang) {
+  let x = px + Math.cos(ang) * 16, y = py + Math.sin(ang) * 16;
+  let dx = Math.cos(ang), dy = Math.sin(ang);
+  const pts = [{ x, y }];
+  for (let bounce = 0; bounce < 7; bounce++) {
+    let best = null;
+    for (const w of maze.walls) {
+      const h = rayRectHit(x, y, dx, dy, w, 4000);
+      if (h && (!best || h.t < best.t)) best = h;
+    }
+    if (!best) { pts.push({ x: x + dx * 4000, y: y + dy * 4000 }); break; }
+    x += dx * best.t; y += dy * best.t;
+    pts.push({ x, y });
+    if (best.nx !== 0) dx = -dx; else dy = -dy;
+    x += dx * 0.5; y += dy * 0.5;
+  }
+  return pts;
+}
 
 let lastFrame = performance.now();
 function draw() {
@@ -630,15 +706,48 @@ function draw() {
       const grad = ctx.createRadialGradient(b.x - 1, b.y - 1, 0.5, b.x, b.y, b.r + 1);
       if (b.k === 'frag') { grad.addColorStop(0, '#666'); grad.addColorStop(1, '#1a1a1a'); }
       else if (b.k === 'shard') { grad.addColorStop(0, LIGHT[b.c] || '#999'); grad.addColorStop(1, DARK[b.c] || '#333'); }
+      else if (b.k === 'bigshot') { grad.addColorStop(0, '#8a92a8'); grad.addColorStop(0.6, '#3c4254'); grad.addColorStop(1, '#12141c'); }
       else { grad.addColorStop(0, '#555'); grad.addColorStop(1, '#111'); }
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       ctx.fillStyle = grad; ctx.fill();
+      if (b.k === 'bigshot') {
+        ctx.strokeStyle = 'rgba(255,180,80,0.5)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 2 + Math.sin(performance.now() / 90) * 1.5, 0, Math.PI * 2); ctx.stroke();
+      }
     }
     ctx.restore();
   }
 
-  // tanks
-  for (const t of s.tanks) if (t.al) drawTank(t, dt);
+  // tanks (ghost = invisible to everyone else)
+  for (const t of s.tanks) {
+    if (!t.al) continue;
+    if (t.gh && t.c !== myColor) continue; // fully invisible to other players
+    drawTank(t, dt);
+  }
+
+  // laser aim preview for me
+  const meT = s.tanks.find(t => t.c === myColor);
+  updateWeaponCard(meT);
+  if (meT && meT.al && meT.w === 'laser') {
+    const pts = laserPreviewPath(meT.x, meT.y, meT.a);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.setLineDash([6, 7]);
+    ctx.lineDashOffset = -(performance.now() / 22) % 13;
+    ctx.strokeStyle = 'rgba(255,80,90,0.65)';
+    ctx.lineWidth = 1.6;
+    ctx.shadowColor = 'rgba(255,80,90,0.8)'; ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // bounce markers
+    for (let i = 1; i < pts.length - 1; i++) {
+      ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, 2.6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,110,120,0.9)'; ctx.fill();
+    }
+    ctx.restore();
+  }
 
   // server effects (laser beams etc)
   for (const e of s.effects) {

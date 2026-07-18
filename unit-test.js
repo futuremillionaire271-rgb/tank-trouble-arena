@@ -90,10 +90,27 @@ room.handleFire(p1);
 const mis = room.bullets.find(b => b.kind === 'missile');
 check('missile fired', !!mis);
 const angBefore = Math.atan2(mis.vy, mis.vx);
+mis.life = 6.9; // skip past 1s arming delay so homing is active
 for (let i = 0; i < 20; i++) room.update(0.016);
 const misNow = room.bullets.find(b => b.kind === 'missile');
 if (misNow) check('missile homes', Math.atan2(misNow.vy, misNow.vx) > angBefore + 0.2);
 else check('missile hit target', p2.alive === false);
+// missile hunts its own shooter too when nearest
+room.bullets = [];
+p2.alive = false;
+p1.weapon = 'missile'; p1.angle = 0;
+room.roundActive = true;
+room.handleFire(p1);
+const mis2 = room.bullets.find(b => b.kind === 'missile');
+mis2.life = 6.9; mis2.x = p1.x + 120; mis2.y = p1.y; mis2.vx = 125; mis2.vy = 0;
+const aB = Math.atan2(mis2.vy, mis2.vx);
+for (let i = 0; i < 30 && room.bullets.includes(mis2); i++) room.update(0.016);
+const turned = !room.bullets.includes(mis2) || Math.abs(angNormTest(Math.atan2(mis2.vy, mis2.vx) - aB)) > 0.15;
+check('missile hunts its own shooter', turned || p1.alive === false);
+function angNormTest(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+p1.alive = true;
+if (room.resetTimer) { clearTimeout(room.resetTimer); room.resetTimer = null; }
+room.roundActive = true;
 
 // --- frag ---
 room.bullets = [];
@@ -110,6 +127,26 @@ room.bullets = [];
 p1.weapon = 'gatling'; p1.ammoSpecial = 28; p1.fireHeld = true; p1.gatlingCd = 0;
 for (let i = 0; i < 60; i++) room.update(0.05);
 check('gatling fires and drains', p1.ammoSpecial < 28);
+
+// --- shotgun ---
+room.bullets = [];
+p1.weapon = 'shotgun'; p1.ammoSpecial = 2;
+room.handleFire(p1);
+check('shotgun fires 6 pellets', room.bullets.length === 6);
+check('shotgun ammo decrements', p1.ammoSpecial === 1);
+
+// --- bigshot ---
+room.bullets = [];
+p1.weapon = 'bigshot';
+room.handleFire(p1);
+const big = room.bullets.find(b => b.kind === 'bigshot');
+check('bigshot fired with big radius', !!big && big.r === 10 && p1.weapon === null);
+
+// --- ghost fully invisible flag in snapshot ---
+p1.ghost = 3;
+const gsnap = room.snapshot();
+check('ghost flag in snapshot', gsnap.tanks.find(t => t.c === p1.color).gh === true);
+p1.ghost = 0;
 
 // --- snapshot shape ---
 const snap = room.snapshot();

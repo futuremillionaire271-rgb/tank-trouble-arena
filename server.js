@@ -148,7 +148,7 @@ const TANK_R = 13, TANK_SPEED = 118, TANK_TURN = 3.8;
 const BULLET_R = 4, BULLET_SPEED = 200, BULLET_LIFE = 9, MAX_BULLETS = 5;
 const COLORS = ['red', 'green', 'blue', 'yellow', 'purple', 'cyan'];
 const MAX_PLAYERS = 6;
-const POWERUP_TYPES = ['laser', 'missile', 'gatling', 'frag', 'shield', 'mine', 'triple', 'speed', 'ghost'];
+const POWERUP_TYPES = ['laser', 'missile', 'gatling', 'frag', 'shield', 'mine', 'triple', 'speed', 'ghost', 'shotgun', 'bigshot'];
 const ROUND_RESET_DELAY = 3500;
 
 // ---------- room ----------
@@ -332,6 +332,15 @@ class Room {
       if (p.ammoSpecial <= 0) p.weapon = null;
       this.pushEvent({ e: 'minePlace', x: p.x, y: p.y });
     }
+    else if (p.weapon === 'shotgun') {
+      for (let i = 0; i < 6; i++) this.fireBullet(p, { kind: 'shard', speed: 220 + rand(-30, 30), life: 0.9, r: 3, angle: p.angle + rand(-0.3, 0.3) });
+      p.ammoSpecial--; shot = true;
+      if (p.ammoSpecial <= 0) p.weapon = null;
+    }
+    else if (p.weapon === 'bigshot') {
+      shot = this.fireBullet(p, { kind: 'bigshot', speed: 130, life: 12, r: 10 });
+      p.weapon = null;
+    }
     else if (p.weapon === 'gatling') { /* continuous */ }
     else shot = this.fireBullet(p);
     if (shot) { p.recoil = 1; this.pushEvent({ e: 'shot', x: p.x, y: p.y, a: p.angle, c: p.color, w: p.weapon || 'normal' }); }
@@ -359,7 +368,7 @@ class Room {
         p.y += Math.sin(p.angle) * sp * dt;
       }
       p.angle = angNorm(p.angle);
-      if (p.ghost <= 0) for (const w of walls) pushCircleOut(p, TANK_R, w);
+      for (const w of walls) pushCircleOut(p, TANK_R, w);
       p.x = clamp(p.x, TANK_R, this.maze.W - TANK_R);
       p.y = clamp(p.y, TANK_R, this.maze.H - TANK_R);
       if (p.weapon === 'gatling' && p.fireHeld) {
@@ -375,12 +384,7 @@ class Room {
       }
       if (p.shield > 0) p.shield -= dt;
       if (p.speedBoost > 0) p.speedBoost -= dt;
-      if (p.ghost > 0) {
-        p.ghost -= dt;
-        if (p.ghost <= 0) { // ensure not stuck inside a wall
-          for (const w of walls) pushCircleOut(p, TANK_R, w);
-        }
-      }
+      if (p.ghost > 0) p.ghost -= dt;
       if (p.recoil > 0) p.recoil -= dt * 5;
       for (let i = this.powerups.length - 1; i >= 0; i--) {
         const pu = this.powerups[i];
@@ -389,12 +393,13 @@ class Room {
           this.pushEvent({ e: 'pickup', x: pu.x, y: pu.y, c: p.color, w: pu.type });
           if (pu.type === 'shield') p.shield = 8;
           else if (pu.type === 'speed') p.speedBoost = 6;
-          else if (pu.type === 'ghost') p.ghost = 4;
+          else if (pu.type === 'ghost') p.ghost = 6;
           else {
             p.weapon = pu.type;
             if (pu.type === 'gatling') { p.ammoSpecial = 28; p.gatlingCd = 0; }
             if (pu.type === 'triple') p.ammoSpecial = 3;
             if (pu.type === 'mine') p.ammoSpecial = 3;
+            if (pu.type === 'shotgun') p.ammoSpecial = 2;
           }
         }
       }
@@ -417,19 +422,22 @@ class Room {
       if (b.fuse !== undefined) { b.fuse -= dt; if (b.fuse <= 0) { this.explodeFrag(b); this.bullets.splice(i, 1); continue; } }
       if (b.life <= 0) { this.bullets.splice(i, 1); continue; }
       if (b.kind === 'missile') {
-        let target = null, bd = Infinity;
-        for (const o of this.players.values()) {
-          if (!o.alive || o.ghost > 0 || (o === b.owner && b.life > 6.5)) continue;
-          const d = dist2(b.x, b.y, o.x, o.y);
-          if (d < bd) { bd = d; target = o; }
-        }
-        if (target) {
-          const want = Math.atan2(target.y - b.y, target.x - b.x);
-          const cur = Math.atan2(b.vy, b.vx);
-          const diff = angNorm(want - cur);
-          const na = cur + clamp(diff, -2.8 * dt, 2.8 * dt);
-          const sp = Math.hypot(b.vx, b.vy);
-          b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
+        // arming delay: flies straight ~1s, then hunts the NEAREST tank - even its owner
+        if (b.life < 7) {
+          let target = null, bd = Infinity;
+          for (const o of this.players.values()) {
+            if (!o.alive || o.ghost > 0) continue;
+            const d = dist2(b.x, b.y, o.x, o.y);
+            if (d < bd) { bd = d; target = o; }
+          }
+          if (target) {
+            const want = Math.atan2(target.y - b.y, target.x - b.x);
+            const cur = Math.atan2(b.vy, b.vx);
+            const diff = angNorm(want - cur);
+            const na = cur + clamp(diff, -3.0 * dt, 3.0 * dt);
+            const sp = Math.hypot(b.vx, b.vy);
+            b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
+          }
         }
       }
       const steps = Math.ceil(Math.hypot(b.vx, b.vy) * dt / 4);
@@ -486,6 +494,7 @@ class Room {
         x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10,
         a: Math.round(p.angle * 1000) / 1000, al: p.alive, w: p.weapon,
         sh: p.shield > 0, sp: p.speedBoost > 0, gh: p.ghost > 0, rc: Math.max(0, Math.round(p.recoil * 100) / 100),
+        am: p.weapon ? p.ammoSpecial : 0,
         seq: p.input.seq,
       })),
       bullets: this.bullets.map(b => ({

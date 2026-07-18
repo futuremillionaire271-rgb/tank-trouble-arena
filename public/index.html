@@ -84,7 +84,14 @@
     backdrop-filter: blur(10px);
   }
   #roomTag:active { transform: scale(.95); }
-  #pingTag { position: absolute; top: 10px; left: 12px; z-index: 8; display: none; color: #56d98a; font-size: 12px; font-weight: 700; background: rgba(12,16,34,.78); padding: 7px 12px; border-radius: 20px; border: 1px solid rgba(120,150,255,.14); backdrop-filter: blur(10px); }
+  #btnExit {
+    position: absolute; top: 10px; left: 12px; z-index: 8; display: none; cursor: pointer;
+    color: #ff8d99; font-size: 13px; font-weight: 800; letter-spacing: 1px;
+    background: rgba(34,14,20,.8); padding: 7px 14px; border-radius: 20px; border: 1px solid rgba(255,90,110,.3);
+    backdrop-filter: blur(10px);
+  }
+  #btnExit:active { transform: scale(.93); }
+  #pingTag { position: absolute; top: 10px; left: 86px; z-index: 8; display: none; color: #56d98a; font-size: 12px; font-weight: 700; background: rgba(12,16,34,.78); padding: 7px 12px; border-radius: 20px; border: 1px solid rgba(120,150,255,.14); backdrop-filter: blur(10px); }
 
   /* kill feed */
   #killfeed { position: absolute; top: 56px; right: 12px; z-index: 8; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; pointer-events: none; }
@@ -130,6 +137,23 @@
   #btnFire.pressed { transform: scale(.9); background: radial-gradient(circle at 35% 30%, rgba(255,150,150,.8), rgba(230,50,70,.6)); }
   #helpKeys { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #3e4a72; font-size: 12px; z-index: 6; display: none; letter-spacing: 1px; }
 
+  /* weapon card */
+  #weaponCard {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(90px); z-index: 8;
+    display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-radius: 16px; pointer-events: none;
+    background: linear-gradient(135deg, rgba(20,26,52,.92), rgba(12,16,34,.92));
+    border: 1px solid rgba(255,210,77,.35); backdrop-filter: blur(12px);
+    box-shadow: 0 10px 40px rgba(0,0,0,.55), 0 0 24px rgba(255,210,77,.12);
+    transition: transform .35s cubic-bezier(.2,1.6,.4,1), opacity .3s; opacity: 0;
+  }
+  #weaponCard.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #weaponCard .wIcon { font-size: 30px; filter: drop-shadow(0 0 8px rgba(255,210,77,.6)); }
+  #weaponCard .wName { color: #ffd24d; font-weight: 900; font-size: 15px; letter-spacing: 1.5px; }
+  #weaponCard .wDesc { color: #9aa8d4; font-size: 12px; font-weight: 600; max-width: 210px; line-height: 1.3; }
+  #weaponCard .wAmmo { display: flex; gap: 4px; margin-top: 3px; }
+  #weaponCard .wAmmo i { width: 8px; height: 8px; border-radius: 50%; background: #ffd24d; box-shadow: 0 0 6px rgba(255,210,77,.7); }
+  #weaponCard .wAmmo i.off { background: #3a4162; box-shadow: none; }
+
   /* toast */
   #toast {
     position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 30;
@@ -162,7 +186,9 @@
 
 <div id="topbar"></div>
 <div id="roomTag" title="Tap to copy invite link"></div>
+<div id="btnExit">✕ EXIT</div>
 <div id="pingTag"></div>
+<div id="weaponCard"><div class="wIcon"></div><div><div class="wName"></div><div class="wDesc"></div><div class="wAmmo"></div></div></div>
 <div id="killfeed"></div>
 <div id="banner"><div id="bannerText"></div><div id="bannerSub"></div></div>
 <canvas id="game"></canvas>
