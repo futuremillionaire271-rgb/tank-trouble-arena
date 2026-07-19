@@ -11,6 +11,14 @@ const SNAP = 1000 / 30;        // snapshots 30 Hz
 // ---------- static file server ----------
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 const server = http.createServer((req, res) => {
+  // if REDIRECT_URL is set (cloud instance), send everyone to the main server
+  // so all players land in the SAME world and room codes always work
+  if (process.env.REDIRECT_URL && req.url.split('?')[0] !== '/health') {
+    const q = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    res.writeHead(302, { Location: process.env.REDIRECT_URL.replace(/\/$/, '') + '/' + q });
+    res.end();
+    return;
+  }
   let urlPath = req.url.split('?')[0];
   if (urlPath === '/') urlPath = '/index.html';
   if (urlPath === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, rooms: rooms.size, region: process.env.RAILWAY_REPLICA_REGION || process.env.RAILWAY_REGION || 'local' })); return; }
