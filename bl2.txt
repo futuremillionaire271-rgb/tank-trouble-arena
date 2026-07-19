@@ -1,0 +1,98 @@
+scheduling build on Metal builder "builder-rdaauf"
+scheduling build on Metal builder "builder-rdaauf"
+fetched snapshot sha256:73d023ad264d0abc38e788abee5db06d7cdedd89e22ba66d49a58313a62841e4 (40 kB bytes)
+[INFO] fetching snapshot
+[INFO] unpacking archive
+using build driver railpack-v0.31.1
+ INFO No package manager inferred, using npm default
+                   
+[38;2;125;86;243m╭─────────────────╮[0m
+[38;2;125;86;243m│[0m Railpack 0.31.1 [38;2;125;86;243m│[0m
+[38;2;125;86;243m╰─────────────────╯[0m
+
+  [97m↳ Detected Node[0m
+  [97m↳ Custom start command detected, skipping Caddy start[0m
+  [97m↳ Custom start command detected, skipping Caddy start[0m
+  [97m↳ Using npm package manager[0m
+  [97m↳ Custom start command detected, skipping Caddy start[0m
+            
+  [1mPackages[0m  
+  [38;5;238m──────────[0m
+  [95mnode[0m  [38;5;238m│[0m  [96m22.23.1[0m  [38;5;238m│[0m  railpack default (22)
+            
+  [1mSteps[0m     
+  [38;5;238m──────────[0m
+  [95m▸ install[0m
+    [38;5;245m$[0m [1mnpm ci[0m
+            
+  [1mDeploy[0m    
+  [38;5;238m──────────[0m
+    [38;5;245m$[0m [1mnpm run start[0m
+
+[INFO] resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.31.1
+[INFO] resolve image config for docker-image://ghcr.io/railwayapp/railpack-frontend:v0.31.1
+[INFO] docker-image://ghcr.io/railwayapp/railpack-frontend:v0.31.1@sha256:27d1e04bfae3b56b048a6e38fbbabf2917ea15f767dd32379acd1e3c0479928c
+[INFO] docker-image://ghcr.io/railwayapp/railpack-frontend:v0.31.1@sha256:27d1e04bfae3b56b048a6e38fbbabf2917ea15f767dd32379acd1e3c0479928c
+[INFO] docker-image://ghcr.io/railwayapp/railpack-frontend:v0.31.1@sha256:27d1e04bfae3b56b048a6e38fbbabf2917ea15f767dd32379acd1e3c0479928c
+[INFO] docker-image://ghcr.io/railwayapp/railpack-frontend:v0.31.1@sha256:27d1e04bfae3b56b048a6e38fbbabf2917ea15f767dd32379acd1e3c0479928c
+[INFO] load build definition from ./railpack-plan.json
+[INFO] load build definition from ./railpack-plan.json
+[INFO] load build definition from ./railpack-plan.json
+[INFO] load build definition from ./railpack-plan.json
+[INFO] copy /etc/mise/config.toml
+[INFO] copy /usr/local/bin/mise
+[INFO] copy /mise/installs
+[INFO] copy /mise/shims
+[INFO] install mise packages: node
+[INFO] create mise config
+[INFO] mkdir /etc/mise
+[INFO] docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.7.6
+[INFO] install apt packages: libatomic1
+[INFO] docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.7.6
+[INFO] [railpack] merge $packages:apt:runtime, $packages:mise, $build, $build
+[INFO] copy /app
+[INFO] copy /root/.cache
+[INFO] copy /app/node_modules
+[INFO] copy / /app
+[INFO] npm ci
+[INFO] copy package.json
+[INFO] copy package-lock.json
+[INFO] loading .
+[INFO] mkdir -p /app/node_modules/.cache
+[INFO] copy /root/.local/state/mise
+[INFO] docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.7.6
+[INFO] loading .
+[INFO] docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.7.6
+[INFO] docker-image://ghcr.io/railwayapp/railpack-runtime:mise-2026.7.6
+[INFO] docker-image://ghcr.io/railwayapp/railpack-builder:mise-2026.7.6
+[INFO] loading .
+[INFO] loading .
+[INFO] mkdir /etc/mise
+[INFO] create mise config
+[INFO] install mise packages: node
+[INFO] mkdir -p /app/node_modules/.cache
+[INFO] copy package-lock.json
+[INFO] copy package.json
+[INFO] npm ci
+[INFO] copy / /app
+[INFO] copy / /app
+[INFO] copy /mise/shims
+[INFO] copy /mise/installs
+[INFO] copy /usr/local/bin/mise
+[INFO] copy /etc/mise/config.toml
+[INFO] copy /root/.local/state/mise
+[INFO] install apt packages: libatomic1
+[INFO] copy /root/.local/state/mise
+[INFO] install apt packages: libatomic1
+[INFO] copy /app/node_modules
+[INFO] copy /root/.cache
+[INFO] copy /app
+[INFO] copy /app
+[INFO] [railpack] merge $packages:apt:runtime, $packages:mise, $build, $build
+[INFO] [railpack] merge $packages:apt:runtime, $packages:mise, $build, $build
+[INFO] exporting to docker image format
+[INFO] exporting to docker image format
+containerimage.digest: sha256:9792eca24f366128879699895c6b80ae43b932128f800e23bd60ceef67acaae1
+containerimage.descriptor: eyJtZWRpYVR5cGUiOiJhcHBsaWNhdGlvbi92bmQub2NpLmltYWdlLm1hbmlmZXN0LnYxK2pzb24iLCJkaWdlc3QiOiJzaGEyNTY6OTc5MmVjYTI0ZjM2NjEyODg3OTY5OTg5NWM2YjgwYWU0M2I5MzIxMjhmODAwZTIzYmQ2MGNlZWY2N2FjYWFlMSIsInNpemUiOjIzODIsImFubm90YXRpb25zIjp7Im9yZy5vcGVuY29udGFpbmVycy5pbWFnZS5jcmVhdGVkIjoiMjAyNi0wNy0xOVQwODoyMDowOFoifSwicGxhdGZvcm0iOnsiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJvcyI6ImxpbnV4In19
+containerimage.config.digest: sha256:1857f511deddb6738f8a34cde7dbcf62caa18951955e675133785cc4c3adfd28
+[INFO] image push
