@@ -76,6 +76,45 @@ function sfx(type) {
   } catch (e) { /* audio optional */ }
 }
 
+// ---------- garage / wallet (persistent via localStorage) ----------
+const SKIN_DEFS = {
+  default: { name: 'STANDARD', price: 0, body: null },
+  gold: { name: 'GOLD', price: 30, body: '#d9a916' },
+  camo: { name: 'CAMO', price: 20, body: '#5a6b3f' },
+  neon: { name: 'NEON', price: 40, body: '#19d3c5' },
+  dark: { name: 'SHADOW', price: 25, body: '#2c2f3c' },
+  ice: { name: 'ICE', price: 35, body: '#9cc8e8' },
+};
+function wallet() { try { return JSON.parse(localStorage.getItem('tt_wallet') || '{"coins":0,"owned":["default"],"equipped":"default"}'); } catch { return { coins: 0, owned: ['default'], equipped: 'default' }; } }
+function saveWallet(w) { try { localStorage.setItem('tt_wallet', JSON.stringify(w)); } catch {} }
+function addCoins(n) { const w = wallet(); w.coins += n; saveWallet(w); refreshWalletUI(); }
+function refreshWalletUI() {
+  const w = wallet();
+  $('walletTop').textContent = w.coins;
+  $('walletBig').textContent = '\ud83e\ude99 ' + w.coins;
+  $('coinHud').textContent = '\ud83e\ude99 ' + w.coins;
+  const grid = $('skinGrid');
+  grid.innerHTML = Object.entries(SKIN_DEFS).map(([id, s]) => {
+    const owned = w.owned.includes(id), eq = w.equipped === id;
+    return `<div class="skinCard ${owned ? 'owned' : ''} ${eq ? 'equipped' : ''}" data-skin="${id}">
+      <div class="sw" style="background:${s.body || 'linear-gradient(135deg,#ff4d5e,#4d9fff)'}"></div>
+      <div class="nm">${s.name}</div>
+      <div class="pr">${eq ? 'EQUIPPED' : owned ? 'TAP TO EQUIP' : s.price + ' \ud83e\ude99'}</div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.skinCard').forEach(el => el.onclick = () => {
+    const id = el.dataset.skin, w2 = wallet(), s = SKIN_DEFS[id];
+    if (w2.owned.includes(id)) { w2.equipped = id; saveWallet(w2); toast(s.name + ' equipped!'); }
+    else if (w2.coins >= s.price) { w2.coins -= s.price; w2.owned.push(id); w2.equipped = id; saveWallet(w2); toast('Bought ' + s.name + '! \ud83c\udf89'); sfx('win'); }
+    else toast('Need ' + (s.price - w2.coins) + ' more coins. Collect \ud83e\ude99 in battle!');
+    refreshWalletUI();
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'setSkin', skin: wallet().equipped }));
+  });
+}
+$('btnGarage').onclick = () => { $('garagePanel').style.display = 'flex'; $('garagePanel').previousElementSibling.style.display = 'none'; refreshWalletUI(); };
+$('btnGarageBack').onclick = () => { $('garagePanel').style.display = 'none'; $('garagePanel').previousElementSibling.style.display = 'flex'; };
+refreshWalletUI();
+
 // ---------- connection ----------
 function connect(msg) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -91,6 +130,9 @@ function connect(msg) {
       $('pingTag').style.display = 'block';
       $('roomTag').textContent = '⧉ ' + roomCode;
       $('btnExit').style.display = 'block';
+      $('btnVoid').style.display = 'block';
+      $('coinHud').style.display = 'block';
+      refreshWalletUI();
       if (isTouch) $('touchUI').style.display = 'block';
       else $('helpKeys').style.display = 'block';
       resize();
@@ -138,6 +180,7 @@ function start(msg) {
   if (ws) return;
   audio();
   msg.name = $('nameInput').value.trim() || 'Player';
+  msg.skin = wallet().equipped;
   try { localStorage.setItem('tt_name', msg.name); } catch {}
   $('menuMsg').textContent = 'Connecting…';
   connect(msg);
@@ -155,6 +198,9 @@ $('roomTag').onclick = () => {
 $('btnExit').onclick = () => {
   if (ws) { try { ws.close(); } catch {} }
   location.href = location.origin;
+};
+$('btnVoid').onclick = () => {
+  if (ws && ws.readyState === 1) { ws.send(JSON.stringify({ type: 'addBot' })); toast('VOID has entered the arena \ud83e\udd16'); $('btnVoid').style.display = 'none'; }
 };
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -227,6 +273,10 @@ function handleEvents(events) {
     else if (ev.e === 'pickup') {
       sfx('pickup'); ringBurst(ev.x, ev.y, COLORS[ev.c]);
       floaters.push({ x: ev.x, y: ev.y, text: ev.w.toUpperCase(), t: 1.2, color: COLORS[ev.c] });
+    } else if (ev.e === 'coin') {
+      sfx('pickup'); ringBurst(ev.x, ev.y, '#ffd24d');
+      floaters.push({ x: ev.x, y: ev.y, text: '+5 \ud83e\ude99', t: 1.4, color: '#ffd24d' });
+      if (ev.c === myColor) { addCoins(5); }
     } else if (ev.e === 'bounce') {
       sparks(ev.x, ev.y, 4); if (Math.random() < 0.4) sfx('bounce');
     } else if (ev.e === 'shieldPop') {
@@ -467,8 +517,11 @@ function roundRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
+const SKIN_BODY = { gold: ['#ffe9a0', '#d9a916', '#8f6d0a'], camo: ['#8fa86b', '#5a6b3f', '#39482a'], neon: ['#8ffff5', '#19d3c5', '#0d8a80'], dark: ['#585d72', '#2c2f3c', '#16181f'], ice: ['#e8f4fc', '#9cc8e8', '#5f8fb4'] };
+
 function drawTank(t, dt) {
-  const col = COLORS[t.c], dark = DARK[t.c], light = LIGHT[t.c];
+  let col = COLORS[t.c], dark = DARK[t.c], light = LIGHT[t.c];
+  if (t.sk && SKIN_BODY[t.sk]) { [light, col, dark] = SKIN_BODY[t.sk]; }
   const recoil = t.rc || 0;
   // tread marks while moving
   const key = t.c;
@@ -560,10 +613,17 @@ function drawTank(t, dt) {
     ctx.fillStyle = '#ffd24d';
     ctx.fillText(label, t.x, t.y - 23);
   }
-  // name
+  // name (VOID gets a glitchy purple tag)
   ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillText(t.n, t.x, t.y + 31);
+  if (t.bot) {
+    ctx.fillStyle = '#b06dff';
+    ctx.shadowColor = '#b06dff'; ctx.shadowBlur = 6;
+    ctx.fillText('◆ VOID ◆', t.x, t.y + 31);
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText(t.n, t.x, t.y + 31);
+  }
 }
 const WEAPON_LABEL = { laser: '⚡ LASER', missile: '🚀 MISSILE', gatling: '🔫 GATLING', frag: '💣 FRAG', mine: '☢ MINES', triple: '⋔ TRIPLE', shotgun: '💥 SHOTGUN', bigshot: '⬤ CANNON' };
 const WEAPON_INFO = {
@@ -662,6 +722,25 @@ function draw() {
 
   const s = interpolatedState();
   if (!s) return;
+
+  // coins (rare golden pickups)
+  for (const cd of s.coins || []) {
+    const bob = Math.sin(performance.now() / 300 + cd.id) * 3;
+    const spin = Math.abs(Math.sin(performance.now() / 350 + cd.id));
+    ctx.save();
+    ctx.translate(cd.x, cd.y + bob);
+    const cg = ctx.createRadialGradient(0, 0, 2, 0, 0, 16);
+    cg.addColorStop(0, 'rgba(255,215,80,0.8)'); cg.addColorStop(1, 'rgba(255,215,80,0)');
+    ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fillStyle = cg; ctx.fill();
+    ctx.scale(Math.max(0.25, spin), 1);
+    ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd24d'; ctx.fill();
+    ctx.strokeStyle = '#b8871a'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#b8871a'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('$', 0, 0.5);
+    ctx.restore();
+  }
+  ctx.textBaseline = 'alphabetic';
 
   // mines
   for (const m of s.mines || []) {

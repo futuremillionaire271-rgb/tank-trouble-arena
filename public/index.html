@@ -161,6 +161,22 @@
   #weaponCard .wAmmo i { width: 8px; height: 8px; border-radius: 50%; background: #ffd24d; box-shadow: 0 0 6px rgba(255,210,77,.7); }
   #weaponCard .wAmmo i.off { background: #3a4162; box-shadow: none; }
 
+  .skinCard { border-radius: 12px; padding: 10px 6px; text-align: center; cursor: pointer; border: 2px solid rgba(120,150,255,.18); background: rgba(10,14,30,.7); transition: transform .12s, border-color .2s; }
+  .skinCard:active { transform: scale(.94); }
+  .skinCard.owned { border-color: rgba(61,220,132,.5); }
+  .skinCard.equipped { border-color: #ffd24d; box-shadow: 0 0 14px rgba(255,210,77,.25); }
+  .skinCard .sw { width: 40px; height: 26px; border-radius: 6px; margin: 0 auto 6px; }
+  .skinCard .nm { color: #dfe6ff; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+  .skinCard .pr { color: #ffd24d; font-size: 11px; font-weight: 700; margin-top: 2px; }
+  #btnVoid {
+    position: absolute; top: 52px; right: 12px; z-index: 8; display: none; cursor: pointer;
+    color: #c9b3ff; font-size: 13px; font-weight: 800; letter-spacing: 1px;
+    background: rgba(24,14,40,.85); padding: 7px 14px; border-radius: 20px; border: 1px solid rgba(160,100,255,.4);
+    backdrop-filter: blur(10px);
+  }
+  #btnVoid:active { transform: scale(.93); }
+  #coinHud { position: absolute; top: 52px; left: 12px; z-index: 8; display: none; color: #ffd24d; font-size: 13px; font-weight: 800; background: rgba(30,24,8,.8); padding: 7px 14px; border-radius: 20px; border: 1px solid rgba(255,210,77,.35); backdrop-filter: blur(10px); }
+
   /* toast */
   #toast {
     position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 30;
@@ -186,14 +202,24 @@
       <div class="field"><input id="roomInput" maxlength="4" placeholder="CODE" style="text-transform:uppercase" autocomplete="off"></div>
       <button class="btn" id="btnJoin">JOIN</button>
     </div>
+    <button class="btn" id="btnGarage" style="background:linear-gradient(135deg,#8a5cff,#5c2fd0);box-shadow:0 8px 24px rgba(130,80,255,.3)">🛠 TANK GARAGE · <span id="walletTop">0</span> 🪙</button>
     <div id="menuMsg"></div>
-    <div class="hint">Up to 6 tanks · bouncing bullets · 9 power-ups · new maze every round</div>
+    <div class="hint">Up to 6 tanks · VOID AI · coins &amp; skins · new maze every round</div>
+  </div>
+  <!-- garage -->
+  <div class="panel" id="garagePanel" style="display:none">
+    <div class="logo"><h1 style="font-size:30px">GARAGE</h1><div class="sub">EARN 🪙 IN BATTLE · BUY SKINS</div></div>
+    <div id="walletBig" style="text-align:center;color:#ffd24d;font-weight:900;font-size:22px">🪙 0</div>
+    <div id="skinGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px"></div>
+    <button class="btn" id="btnGarageBack" style="background:linear-gradient(135deg,#4a5578,#2c3350)">← BACK</button>
   </div>
 </div>
 
 <div id="topbar"></div>
 <div id="roomTag" title="Tap to copy invite link"></div>
 <div id="btnExit">✕ EXIT</div>
+<div id="btnVoid">🤖 ADD VOID</div>
+<div id="coinHud">🪙 0</div>
 <div id="pingTag"></div>
 <div id="weaponCard"><div class="wIcon"></div><div><div class="wName"></div><div class="wDesc"></div><div class="wAmmo"></div></div></div>
 <div id="killfeed"></div>

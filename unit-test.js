@@ -90,7 +90,7 @@ room.handleFire(p1);
 const mis = room.bullets.find(b => b.kind === 'missile');
 check('missile fired', !!mis);
 const angBefore = Math.atan2(mis.vy, mis.vx);
-mis.life = 6.9; // skip past 1s arming delay so homing is active
+mis.life = 5.0; // skip past arming delay so homing is active
 for (let i = 0; i < 20; i++) room.update(0.016);
 const misNow = room.bullets.find(b => b.kind === 'missile');
 if (misNow) check('missile homes', Math.atan2(misNow.vy, misNow.vx) > angBefore + 0.2);
@@ -102,7 +102,7 @@ p1.weapon = 'missile'; p1.angle = 0;
 room.roundActive = true;
 room.handleFire(p1);
 const mis2 = room.bullets.find(b => b.kind === 'missile');
-mis2.life = 6.9; mis2.x = p1.x + 120; mis2.y = p1.y; mis2.vx = 125; mis2.vy = 0;
+mis2.life = 5.0; mis2.x = p1.x + 120; mis2.y = p1.y; mis2.vx = 150; mis2.vy = 0;
 const aB = Math.atan2(mis2.vy, mis2.vx);
 for (let i = 0; i < 30 && room.bullets.includes(mis2); i++) room.update(0.016);
 const turned = !room.bullets.includes(mis2) || Math.abs(angNormTest(Math.atan2(mis2.vy, mis2.vx) - aB)) > 0.15;
@@ -147,6 +147,70 @@ p1.ghost = 3;
 const gsnap = room.snapshot();
 check('ghost flag in snapshot', gsnap.tanks.find(t => t.c === p1.color).gh === true);
 p1.ghost = 0;
+
+// --- missile does NOT explode on walls (bounces instead) ---
+room.bullets = [];
+p2.alive = true; p2.ghost = 0;
+const wallRect = { x: 400, y: 150, w: 10, h: 100 };
+room.maze.walls = [wallRect];
+p1.x = 300; p1.y = 200; p1.angle = 0; p1.weapon = 'missile';
+p2.x = 300; p2.y = 2000; // far away so missile hits wall first
+room.handleFire(p1);
+const wm = room.bullets.find(b => b.kind === 'missile');
+wm.life = 6; // keep in pre-homing phase, flying straight at wall
+for (let i = 0; i < 40 && room.bullets.includes(wm); i++) room.update(0.016);
+check('missile survives wall hit (bounces)', room.bullets.includes(wm));
+check('missile bounced back (vx flipped)', wm.vx < 0);
+room.bullets = []; room.maze.walls = [];
+
+// --- missile expires after its timer ---
+p1.weapon = 'missile';
+room.handleFire(p1);
+const em = room.bullets.find(b => b.kind === 'missile');
+check('missile lifetime is 6s', em.life === 6);
+em.life = 0.01;
+room.update(0.016);
+check('missile expires when dodged long enough', !room.bullets.includes(em));
+room.bullets = [];
+
+// --- VOID bot ---
+const bot = room.addBot();
+check('VOID joins', bot && bot.isBot && bot.name === 'VOID');
+check('cannot add second bot', room.bot === bot);
+room.roundActive = true;
+if (room.resetTimer) { clearTimeout(room.resetTimer); room.resetTimer = null; }
+bot.alive = true; p1.alive = true; p2.alive = true;
+bot.x = 100; bot.y = 100; p1.x = 400; p1.y = 100;
+room.maze.walls = [];
+const bx = bot.x;
+for (let i = 0; i < 60; i++) room.update(0.016);
+check('VOID moves on its own', Math.hypot(bot.x - bx, bot.y - 100) > 10);
+let botShot = false;
+const origFire = room.fireBullet.bind(room);
+room.fireBullet = (p, o) => { if (p === bot) botShot = true; return origFire(p, o); };
+for (let i = 0; i < 400 && !botShot; i++) room.update(0.016);
+room.fireBullet = origFire;
+check('VOID shoots at enemies', botShot);
+const aimBefore = room.botState.aimErr;
+room.killTank(p2, bot);
+check('VOID aim sharpens after kill (learning)', room.botState.aimErr < aimBefore);
+if (room.resetTimer) { clearTimeout(room.resetTimer); room.resetTimer = null; }
+room.roundActive = true;
+
+// --- coins ---
+room.coinDrops = [{ id: 999, x: p1.x, y: p1.y }];
+room.events = [];
+p1.alive = true;
+const coinsBefore = p1.coins;
+room.update(0.016);
+check('coin collected', p1.coins === coinsBefore + 5 && room.coinDrops.length === 0);
+check('coin event emitted', room.events.some(e => e.e === 'coin'));
+
+// --- pathfinding ---
+const { bfsNext: bfs, cellIndex: ci } = require('./server.js');
+const testMaze = room.maze;
+const step = bfs(testMaze, { c: 0, r: 0 }, { c: testMaze.cols - 1, r: testMaze.rows - 1 });
+check('bfs returns a step or null cleanly', step === null || (typeof step.c === 'number' && typeof step.r === 'number'));
 
 // --- snapshot shape ---
 const snap = room.snapshot();

@@ -76,7 +76,41 @@ function generateMaze(playerCount = 3) {
   }
   for (let c = 0; c < cols; c++) walls.push({ x: c * CELL - WALL_T / 2, y: H - WALL_T / 2, w: CELL + WALL_T, h: WALL_T });
   for (let r = 0; r < rows; r++) walls.push({ x: W - WALL_T / 2, y: r * CELL - WALL_T / 2, w: WALL_T, h: CELL + WALL_T });
-  return { cols, rows, walls, W, H };
+  // open adjacency per cell [up,right,down,left] for pathfinding
+  const open = cells.map(row => row.map(w => [!w[0], !w[1], !w[2], !w[3]]));
+  return { cols, rows, walls, W, H, open };
+}
+
+// grid helpers for AI + missile routing
+function cellIndex(maze, x, y) {
+  return { c: clamp(Math.floor(x / CELL), 0, maze.cols - 1), r: clamp(Math.floor(y / CELL), 0, maze.rows - 1) };
+}
+function bfsNext(maze, from, to) {
+  if (from.c === to.c && from.r === to.r) return null;
+  const key = (c, r) => r * maze.cols + c;
+  const prev = new Int32Array(maze.cols * maze.rows).fill(-1);
+  const seen = new Uint8Array(maze.cols * maze.rows);
+  const q = [[from.c, from.r]];
+  seen[key(from.c, from.r)] = 1;
+  const D = [[0, -1, 0], [1, 0, 1], [0, 1, 2], [-1, 0, 3]];
+  while (q.length) {
+    const [c, r] = q.shift();
+    if (c === to.c && r === to.r) break;
+    const op = maze.open[r][c];
+    for (const [dc, dr, di] of D) {
+      if (!op[di]) continue;
+      const nc = c + dc, nr = r + dr, k = key(nc, nr);
+      if (seen[k]) continue;
+      seen[k] = 1; prev[k] = key(c, r); q.push([nc, nr]);
+    }
+  }
+  let cur = key(to.c, to.r);
+  if (!seen[cur]) return null;
+  const fromK = key(from.c, from.r);
+  let steps = 0;
+  while (prev[cur] !== fromK && prev[cur] !== -1 && steps < 2000) { cur = prev[cur]; steps++; }
+  if (prev[cur] === -1 && cur !== fromK) return null;
+  return { c: cur % maze.cols, r: Math.floor(cur / maze.cols) };
 }
 
 // ---------- collision ----------
@@ -151,6 +185,8 @@ const MAX_PLAYERS = 6;
 const POWERUP_TYPES = ['laser', 'missile', 'gatling', 'frag', 'shield', 'mine', 'triple', 'speed', 'ghost', 'shotgun', 'bigshot'];
 const ROUND_RESET_DELAY = 3500;
 
+const SKINS = ['default', 'gold', 'camo', 'neon', 'dark', 'ice'];
+
 // ---------- room ----------
 const rooms = new Map();
 function roomCode() {
@@ -166,6 +202,10 @@ class Room {
     this.bullets = [];
     this.mines = [];
     this.powerups = [];
+    this.coinDrops = [];
+    this.coinTimer = 10;
+    this.bot = null;
+    this.botState = null;
     this.effects = [];
     this.events = [];   // one-shot events for clients: shots, kills, pickups
     this.maze = generateMaze(3);
@@ -178,11 +218,12 @@ class Room {
   }
   freeColor() { return COLORS.find(c => ![...this.players.values()].some(p => p.color === c)); }
 
-  addPlayer(ws, name) {
+  addPlayer(ws, name, skin) {
     const color = this.freeColor();
     if (!color || this.players.size >= MAX_PLAYERS) return null;
     const p = {
-      ws, name: (name || 'Player').slice(0, 12), color, score: 0, kills: 0,
+      ws, name: (name || 'Player').slice(0, 12), color, score: 0, kills: 0, coins: 0,
+      skin: SKINS.includes(skin) ? skin : 'default', isBot: false,
       x: 0, y: 0, angle: 0, alive: false,
       input: { turn: 0, move: 0, fire: false, vecAngle: null, vecThrottle: 0, seq: 0 },
       weapon: null, ammoSpecial: 0, gatlingCd: 0, fireHeld: false, shield: 0, speedBoost: 0, ghost: 0,
@@ -198,10 +239,22 @@ class Room {
     const p = this.players.get(ws);
     if (p) this.pushEvent({ e: 'leave', c: p.color, n: p.name });
     this.players.delete(ws);
-    if (this.players.size === 0) {
+    const humansLeft = [...this.players.values()].some(pl => !pl.isBot);
+    if (this.players.size === 0 || !humansLeft) {
       if (this.resetTimer) clearTimeout(this.resetTimer);
       rooms.delete(this.code);
     } else this.endRoundCheck();
+  }
+
+  addBot() {
+    const key = { readyState: 3, send() {}, isBotKey: true };
+    const p = this.addPlayer(key, 'VOID');
+    if (p) {
+      p.isBot = true;
+      this.bot = p;
+      this.botState = { cd: 1, aimErr: 0.10, wp: null, pathT: 0, mem: new Map() };
+    }
+    return p;
   }
   pushEvent(ev) { this.events.push(ev); }
 
@@ -222,6 +275,9 @@ class Room {
     this.roundNum++;
     this.maze = generateMaze(this.players.size);
     this.bullets = []; this.mines = []; this.powerups = []; this.effects = [];
+    this.coinDrops = [];
+    this.coinTimer = rand(6, 12);
+    if (this.botState) { this.botState.wp = null; this.botState.cd = 1.2; }
     this.powerupTimer = rand(2.5, 4.5);
     for (const p of this.players.values()) this.spawnTank(p);
     this.broadcast({ type: 'round', maze: this.maze, num: this.roundNum });
@@ -245,6 +301,11 @@ class Room {
     if (!p.alive) return;
     if (p.shield > 0) { p.shield = 0; this.effects.push({ kind: 'shieldPop', x: p.x, y: p.y, t: 0.4 }); this.pushEvent({ e: 'shieldPop', x: p.x, y: p.y }); return; }
     p.alive = false;
+    // VOID learns: hitting players sharpens aim, dying loosens it (stays beatable)
+    if (this.botState) {
+      if (killer === this.bot && p !== this.bot) this.botState.aimErr = Math.max(0.025, this.botState.aimErr * 0.9);
+      if (p === this.bot) this.botState.aimErr = Math.min(0.14, this.botState.aimErr * 1.12);
+    }
     this.effects.push({ kind: 'explosion', x: p.x, y: p.y, t: 0.9, color: p.color, big: true });
     const kn = killer && killer !== p ? killer.name : null;
     if (killer && killer !== p) killer.kills++;
@@ -319,7 +380,7 @@ class Room {
     if (!p.alive || !this.roundActive) return;
     let shot = false;
     if (p.weapon === 'laser') { this.fireLaser(p); p.weapon = null; shot = true; }
-    else if (p.weapon === 'missile') { shot = this.fireBullet(p, { kind: 'missile', speed: 125, life: 8, r: 6 }); p.weapon = null; }
+    else if (p.weapon === 'missile') { shot = this.fireBullet(p, { kind: 'missile', speed: 150, life: 6, r: 6 }); p.weapon = null; }
     else if (p.weapon === 'frag') { shot = this.fireBullet(p, { kind: 'frag', speed: 155, life: 5, r: 6, fuse: 1.4 }); p.weapon = null; }
     else if (p.weapon === 'triple') {
       for (const off of [-0.2, 0, 0.2]) this.fireBullet(p, { kind: 'shard', speed: BULLET_SPEED, life: 6, r: 4, angle: p.angle + off });
@@ -424,8 +485,9 @@ class Room {
       if (b.fuse !== undefined) { b.fuse -= dt; if (b.fuse <= 0) { this.explodeFrag(b); this.bullets.splice(i, 1); continue; } }
       if (b.life <= 0) { this.bullets.splice(i, 1); continue; }
       if (b.kind === 'missile') {
-        // arming delay: flies straight ~1s, then hunts the NEAREST tank - even its owner
-        if (b.life < 7) {
+        // route-following missile: after short arming, it navigates the maze
+        // using corridor waypoints toward the nearest tank (even its owner).
+        if (b.life < 5.2) {
           let target = null, bd = Infinity;
           for (const o of this.players.values()) {
             if (!o.alive || o.ghost > 0) continue;
@@ -433,10 +495,19 @@ class Room {
             if (d < bd) { bd = d; target = o; }
           }
           if (target) {
-            const want = Math.atan2(target.y - b.y, target.x - b.x);
+            // direct line if clear, otherwise steer along maze route (no wall hugging)
+            let gx = target.x, gy = target.y;
+            const dxT = target.x - b.x, dyT = target.y - b.y;
+            const dLen = Math.hypot(dxT, dyT) || 1;
+            const losHit = raycast(b.x, b.y, dxT / dLen, dyT / dLen, this.maze.walls, dLen);
+            if (losHit) {
+              const next = bfsNext(this.maze, cellIndex(this.maze, b.x, b.y), cellIndex(this.maze, target.x, target.y));
+              if (next) { gx = next.c * CELL + CELL / 2; gy = next.r * CELL + CELL / 2; }
+            }
+            const want = Math.atan2(gy - b.y, gx - b.x);
             const cur = Math.atan2(b.vy, b.vx);
             const diff = angNorm(want - cur);
-            const na = cur + clamp(diff, -3.0 * dt, 3.0 * dt);
+            const na = cur + clamp(diff, -4.2 * dt, 4.2 * dt);
             const sp = Math.hypot(b.vx, b.vy);
             b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
           }
@@ -449,7 +520,7 @@ class Room {
         for (const w of walls) {
           if (bounceOffRect(b, b.r, w)) {
             this.pushEvent({ e: 'bounce', x: b.x, y: b.y });
-            if (b.kind === 'missile') { this.effects.push({ kind: 'explosion', x: b.x, y: b.y, t: 0.5, color: 'orange' }); this.pushEvent({ e: 'boom', x: b.x, y: b.y }); dead = true; }
+            // missiles only explode on tanks - walls just bounce them
             if (b.kind === 'frag') { this.explodeFrag(b); dead = true; }
             break;
           }
@@ -468,6 +539,28 @@ class Room {
       }
       if (dead) this.bullets.splice(i, 1);
     }
+    // coins: rare pickups worth 5, spawn like powerups but scarce
+    if (this.roundActive) {
+      this.coinTimer -= dt;
+      if (this.coinTimer <= 0 && this.coinDrops.length < 1) {
+        this.coinTimer = rand(14, 26);
+        const c = randInt(0, this.maze.cols - 1), r = randInt(0, this.maze.rows - 1);
+        this.coinDrops.push({ id: this.nextId++, x: c * CELL + CELL / 2, y: r * CELL + CELL / 2 });
+      }
+      for (const p of this.players.values()) {
+        if (!p.alive) continue;
+        for (let i = this.coinDrops.length - 1; i >= 0; i--) {
+          const cd = this.coinDrops[i];
+          if (dist2(p.x, p.y, cd.x, cd.y) < (TANK_R + 11) ** 2) {
+            this.coinDrops.splice(i, 1);
+            p.coins += 5;
+            this.pushEvent({ e: 'coin', x: cd.x, y: cd.y, c: p.color, total: p.coins });
+          }
+        }
+      }
+    }
+    // VOID bot brain
+    if (this.bot && this.bot.alive && this.roundActive) this.updateBot(dt);
     // powerups spawn
     if (this.roundActive) {
       this.powerupTimer -= dt;
@@ -487,12 +580,88 @@ class Room {
     }
   }
 
+  updateBot(dt) {
+    const bot = this.bot, st = this.botState;
+    st.cd -= dt;
+    // target: nearest living human
+    let target = null, bd = Infinity;
+    for (const o of this.players.values()) {
+      if (o === bot || !o.alive) continue;
+      const d = dist2(bot.x, bot.y, o.x, o.y);
+      if (d < bd) { bd = d; target = o; }
+    }
+    // detour to nearby powerup when unarmed
+    let goal = target;
+    if (!bot.weapon) {
+      for (const pu of this.powerups) {
+        if (dist2(bot.x, bot.y, pu.x, pu.y) < 220 ** 2) { goal = pu; break; }
+      }
+    }
+    if (!goal) { bot.input.move = 0; bot.input.turn = 0; return; }
+    // learn per-player habits: remember victim's average speed to lead shots
+    if (target) {
+      const mem = st.mem.get(target.color) || { vx: 0, vy: 0, px: target.x, py: target.y };
+      mem.vx = mem.vx * 0.9 + (target.x - mem.px) / Math.max(dt, 0.001) * 0.1;
+      mem.vy = mem.vy * 0.9 + (target.y - mem.py) / Math.max(dt, 0.001) * 0.1;
+      mem.px = target.x; mem.py = target.y;
+      st.mem.set(target.color, mem);
+    }
+    // navigate: direct if line of sight, else BFS waypoint
+    let gx = goal.x, gy = goal.y;
+    const ddx = goal.x - bot.x, ddy = goal.y - bot.y;
+    const dLen = Math.hypot(ddx, ddy) || 1;
+    const losHit = raycast(bot.x, bot.y, ddx / dLen, ddy / dLen, this.maze.walls, dLen);
+    if (losHit) {
+      st.pathT -= dt;
+      if (st.pathT <= 0 || !st.wp) {
+        st.pathT = 0.25;
+        st.wp = bfsNext(this.maze, cellIndex(this.maze, bot.x, bot.y), cellIndex(this.maze, goal.x, goal.y));
+      }
+      if (st.wp) { gx = st.wp.c * CELL + CELL / 2; gy = st.wp.r * CELL + CELL / 2; }
+    } else st.wp = null;
+    // dodge incoming bullets: sidestep if a bullet will pass close soon
+    let dodge = 0;
+    for (const b of this.bullets) {
+      if (b.owner === bot && b.grace > 0) continue;
+      const relX = bot.x - b.x, relY = bot.y - b.y;
+      const sp = Math.hypot(b.vx, b.vy) || 1;
+      const tClose = (relX * b.vx + relY * b.vy) / (sp * sp);
+      if (tClose > 0 && tClose < 0.6) {
+        const cx = b.x + b.vx * tClose, cy = b.y + b.vy * tClose;
+        if (dist2(bot.x, bot.y, cx, cy) < 42 ** 2) { dodge = Math.sign((relX * b.vy - relY * b.vx)) || 1; break; }
+      }
+    }
+    // steer
+    const wantA = Math.atan2(gy - bot.y, gx - bot.x) + dodge * 0.9;
+    bot.input.vecAngle = wantA;
+    bot.input.vecThrottle = 0.95;
+    // fire: direct LOS to target with predictive lead + adaptive aim error
+    if (target && st.cd <= 0) {
+      const mem = st.mem.get(target.color) || { vx: 0, vy: 0 };
+      const lead = Math.min(Math.hypot(target.x - bot.x, target.y - bot.y) / BULLET_SPEED, 0.8);
+      const px = target.x + mem.vx * lead, py = target.y + mem.vy * lead;
+      const pdx = px - bot.x, pdy = py - bot.y;
+      const pLen = Math.hypot(pdx, pdy) || 1;
+      const clear = !raycast(bot.x, bot.y, pdx / pLen, pdy / pLen, this.maze.walls, pLen);
+      const aimA = Math.atan2(pdy, pdx) + rand(-st.aimErr, st.aimErr);
+      const facing = Math.abs(angNorm(aimA - bot.angle)) < 0.24;
+      if (clear && pLen < 480) {
+        bot.input.vecAngle = aimA; // snap aim toward target
+        if (facing) {
+          this.handleFire(bot);
+          bot.fireHeld = bot.weapon === 'gatling';
+          st.cd = bot.weapon ? 0.3 : rand(0.7, 1.3);
+        }
+      } else if (bot.fireHeld) bot.fireHeld = false;
+    }
+  }
+
   snapshot() {
     const snap = {
       type: 'state',
       t: Date.now(),
       tanks: [...this.players.values()].map(p => ({
-        c: p.color, n: p.name, s: p.score, k: p.kills,
+        c: p.color, n: p.name, s: p.score, k: p.kills, cn: p.coins, sk: p.skin, bot: p.isBot || undefined,
         x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10,
         a: Math.round(p.angle * 1000) / 1000, al: p.alive, w: p.weapon,
         sh: p.shield > 0, sp: p.speedBoost > 0, gh: p.ghost > 0, rc: Math.max(0, Math.round(p.recoil * 100) / 100),
@@ -504,10 +673,11 @@ class Room {
         vx: Math.round(b.vx), vy: Math.round(b.vy), k: b.kind, c: b.ownerColor, r: b.r,
       })),
       mines: this.mines.map(m => ({ id: m.id, x: m.x, y: m.y, armed: m.arm <= 0 })),
+      coins: this.coinDrops,
       powerups: this.powerups,
       effects: this.effects,
       events: this.events,
-      waiting: this.players.size < 2,
+      waiting: [...this.players.values()].filter(p => !p.isBot).length < 1 || this.players.size < 2,
     };
     this.events = [];
     return snap;
@@ -533,10 +703,18 @@ wss.on('connection', (ws) => {
         room = [...rooms.values()].find(r => r.players.size > 0 && r.players.size < MAX_PLAYERS);
         if (!room) { room = new Room(roomCode()); rooms.set(room.code, room); }
       }
-      const p = room.addPlayer(ws, m.name);
+      const p = room.addPlayer(ws, m.name, m.skin);
       if (!p) { ws.send(JSON.stringify({ type: 'error', msg: 'Room is full' })); return; }
       ws.room = room; ws.player = p;
       ws.send(JSON.stringify({ type: 'joined', room: room.code, color: p.color, maze: room.maze, maxPlayers: MAX_PLAYERS }));
+      if (m.bot && !room.bot) room.addBot();
+    } else if (m.type === 'addBot' && ws.room) {
+      if (!ws.room.bot && ws.room.players.size < MAX_PLAYERS) {
+        ws.room.addBot();
+        if (!ws.room.roundActive && !ws.room.resetTimer && ws.room.players.size >= 2) ws.room.startRound();
+      }
+    } else if (m.type === 'setSkin' && ws.player) {
+      if (SKINS.includes(m.skin)) ws.player.skin = m.skin;
     } else if (m.type === 'input' && ws.player) {
       const p = ws.player, inp = p.input;
       if (typeof m.seq === 'number') inp.seq = m.seq;
@@ -569,5 +747,5 @@ setInterval(() => {
 if (require.main === module) {
   server.listen(PORT, () => console.log(`Tank Trouble v2 server on http://localhost:${PORT}`));
 } else {
-  module.exports = { Room, generateMaze, CELL, TANK_R, rooms };
+  module.exports = { Room, generateMaze, CELL, TANK_R, rooms, bfsNext, cellIndex };
 }
