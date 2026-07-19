@@ -186,8 +186,9 @@ function raycast(x, y, dx, dy, walls, maxDist) {
 }
 
 // ---------- game constants ----------
-const TANK_R = 13, TANK_SPEED = 118, TANK_TURN = 3.8;
-const BULLET_R = 4, BULLET_SPEED = 200, BULLET_LIFE = 9, MAX_BULLETS = 5;
+// classic-feel tuning: deliberate movement, slow long-lived bouncing bullets
+const TANK_R = 13, TANK_SPEED = 100, TANK_TURN = 3.3;
+const BULLET_R = 4.5, BULLET_SPEED = 155, BULLET_LIFE = 10, MAX_BULLETS = 5;
 const COLORS = ['red', 'green', 'blue', 'yellow', 'purple', 'cyan'];
 const MAX_PLAYERS = 6;
 const POWERUP_TYPES = ['laser', 'missile', 'gatling', 'frag', 'shield', 'mine', 'triple', 'speed', 'ghost', 'shotgun', 'bigshot'];
@@ -433,8 +434,9 @@ class Room {
         p.x += Math.cos(p.angle) * sp * dt;
         p.y += Math.sin(p.angle) * sp * dt;
       } else {
+        // classic controls: rotate in place, forward/back along heading
         p.angle += inp.turn * TANK_TURN * dt;
-        const sp = inp.move * TANK_SPEED * spdMul * (inp.move < 0 ? 0.62 : 1);
+        const sp = inp.move * TANK_SPEED * spdMul * (inp.move < 0 ? 0.7 : 1);
         p.x += Math.cos(p.angle) * sp * dt;
         p.y += Math.sin(p.angle) * sp * dt;
       }
